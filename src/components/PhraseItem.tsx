@@ -9,6 +9,7 @@ interface PhraseItemProps {
     onEdit?: () => void;
     onDelete?: () => void;
     showManageControls?: boolean;
+    compact?: boolean;
 }
 
 export const PhraseItem: React.FC<PhraseItemProps> = ({
@@ -17,35 +18,40 @@ export const PhraseItem: React.FC<PhraseItemProps> = ({
     onEdit,
     onDelete,
     showManageControls = false,
+    compact = false,
 }) => {
     return (
         <TouchableOpacity
-            style={styles.container}
+            style={[styles.container, compact && styles.compactContainer]}
             onPress={onPress}
             disabled={!onPress}
         >
             <View style={styles.content}>
                 <View style={styles.pictogramsContainer}>
-                    {phrase.pictograms.map((pic, index) => (
+                    {phrase.pictograms.slice(0, compact ? 3 : undefined).map((pic, index) => (
                         <View key={index} style={styles.pictogramWrapper}>
-                            <Image source={{ uri: pic.url }} style={styles.pictogramImage} />
-                            <Text style={styles.pictogramWord}>{pic.word}</Text>
+                            <Image
+                                source={{ uri: pic.base64 || pic.url }}
+                                style={compact ? styles.compactPictogramImage : styles.pictogramImage}
+                            />
+                            {!compact && <Text style={styles.pictogramWord}>{pic.word}</Text>}
                         </View>
                     ))}
                 </View>
-                <Text style={styles.phraseText}>{phrase.text}</Text>
+                <Text style={[styles.phraseText, compact && styles.compactPhraseText]} numberOfLines={compact ? 2 : undefined}>
+                    {phrase.text}
+                </Text>
                 {showManageControls && (
                     <Text style={styles.usageCount}>Usado: {phrase.usage_count} veces</Text>
                 )}
             </View>
-
             {showManageControls && (
-                <View style={styles.controls}>
-                    <TouchableOpacity onPress={onEdit} style={styles.controlButton}>
-                        <Ionicons name="pencil" size={24} color="#4A90E2" />
+                <View style={styles.floatingControls}>
+                    <TouchableOpacity onPress={onEdit} style={styles.floatingButton}>
+                        <Ionicons name="pencil" size={16} color="#FFFFFF" />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={onDelete} style={styles.controlButton}>
-                        <Ionicons name="trash" size={24} color="#E25C5C" />
+                    <TouchableOpacity onPress={onDelete} style={[styles.floatingButton, styles.deleteButton]}>
+                        <Ionicons name="trash" size={16} color="#FFFFFF" />
                     </TouchableOpacity>
                 </View>
             )}
@@ -62,14 +68,22 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+        position: 'relative',
+    },
+    compactContainer: {
+        flexDirection: 'column',
+        alignItems: 'stretch',
+        padding: 10,
+        marginBottom: 0,
     },
     content: {
         flex: 1,
+        paddingRight: 70,
     },
     pictogramsContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        marginBottom: 8,
+        marginBottom: 6,
     },
     pictogramWrapper: {
         alignItems: 'center',
@@ -79,6 +93,11 @@ const styles = StyleSheet.create({
     pictogramImage: {
         width: 40,
         height: 40,
+        resizeMode: 'contain',
+    },
+    compactPictogramImage: {
+        width: 30,
+        height: 30,
         resizeMode: 'contain',
     },
     pictogramWord: {
@@ -91,17 +110,32 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#333',
     },
+    compactPhraseText: {
+        fontSize: 14,
+        lineHeight: 18,
+    },
     usageCount: {
         fontSize: 12,
         color: '#999',
         marginTop: 4,
     },
-    controls: {
+    floatingControls: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
         flexDirection: 'row',
-        marginLeft: 12,
+        gap: 6,
     },
-    controlButton: {
-        padding: 8,
-        marginLeft: 4,
+    floatingButton: {
+        backgroundColor: '#4A90E2',
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+    },
+    deleteButton: {
+        backgroundColor: '#E25C5C',
     },
 });

@@ -72,10 +72,6 @@ export const PhraseEditorModal: React.FC<PhraseEditorModalProps> = ({
         // Avoid duplicates
         if (!selectedPictograms.find(p => p.url === pic.url)) {
             setSelectedPictograms([...selectedPictograms, pic]);
-            // Auto-append text if needed
-            if (!text.includes(pic.word)) {
-                setText(prev => prev ? `${prev} ${pic.word}` : pic.word);
-            }
         }
     };
 
@@ -121,7 +117,7 @@ export const PhraseEditorModal: React.FC<PhraseEditorModalProps> = ({
                                 onPress={() => removePictogram(index)}
                                 style={styles.selectedPictogramWrapper}
                             >
-                                <Image source={{ uri: pic.url }} style={styles.pictogramImage} />
+                                <Image source={{ uri: pic.base64 || pic.url }} style={styles.pictogramImage} />
                                 <Text style={styles.pictogramWord} numberOfLines={1}>{pic.word}</Text>
                                 <View style={styles.removeBadge}>
                                     <Ionicons name="close" size={12} color="white" />
@@ -162,7 +158,7 @@ export const PhraseEditorModal: React.FC<PhraseEditorModalProps> = ({
                                     style={styles.pictogramOption}
                                     onPress={() => addPictogram(item)}
                                 >
-                                    <Image source={{ uri: item.url }} style={styles.pictogramImage} />
+                                    <Image source={{ uri: item.base64 || item.url }} style={styles.pictogramImage} />
                                     <Text style={styles.pictogramWord} numberOfLines={2}>{item.word}</Text>
                                 </TouchableOpacity>
                             )}

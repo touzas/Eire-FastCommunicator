@@ -1,6 +1,7 @@
 export interface Pictogram {
     word: string;
     url: string;
+    base64?: string;
 }
 
 export interface Phrase {

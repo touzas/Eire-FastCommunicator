@@ -11,15 +11,17 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../src/context/AuthContext';
 import { usePhrases } from '../src/context/PhrasesContext';
 import { Phrase, Pictogram } from '../src/types';
 
 export default function MainScreen() {
     const router = useRouter();
     const { phrases, updatePhraseUsage } = usePhrases();
+    const { user, signOut } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
     const [builtPhrase, setBuiltPhrase] = useState<{ text: string; pictograms: Pictogram[] }>({
         text: '',
@@ -27,6 +29,8 @@ export default function MainScreen() {
     });
     const searchInputRef = React.useRef<TextInput>(null);
     const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null);
+    const [showPictograms, setShowPictograms] = useState(false);
+    const [showCompactHeader, setShowCompactHeader] = useState(false);
 
 
     const filteredPhrases = useMemo(() => {
@@ -46,6 +50,16 @@ export default function MainScreen() {
                 return a.text.localeCompare(b.text);
             });
     }, [phrases, searchQuery]);
+
+    const handleSearchChange = (text: string) => {
+        setSearchQuery(text);
+        // Mostrar cabecera compacta cuando el usuario empieza a escribir
+        if (text.length > 0) {
+            setShowCompactHeader(true);
+        } else {
+            setShowCompactHeader(false);
+        }
+    };
 
     const addToBuilder = (phrase: Phrase) => {
         setBuiltPhrase((prev) => {
@@ -85,31 +99,58 @@ export default function MainScreen() {
         setBuiltPhrase({ text: builtPhrase.text, pictograms: newPictograms });
     };
 
+    const handleLogout = async () => {
+        await signOut();
+        router.replace('/login');
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" />
-
-            {/* Header: Title Left, Settings Right */}
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Eire Fast Conversation</Text>
-                <TouchableOpacity
-                    onPress={() => router.push('/manage-phrases')}
-                    style={styles.settingsButton}
-                >
-                    <Ionicons name="settings-outline" size={26} color="#9333EA" />
-                </TouchableOpacity>
-            </View>
-
-            {/* Built Text - Outside yellow container */}
-            {builtPhrase.text && (
-                <View style={styles.builtTextRow}>
-                    <Text style={styles.builtText}>
-                        {builtPhrase.text}
-                    </Text>
+            {!showCompactHeader && (
+                <View style={styles.header}>
+                    <View>
+                        <Text style={styles.headerTitle}>Eire Fast Conversation</Text>
+                    </View>
+                    <View style={styles.headerButtons}>
+                        <TouchableOpacity style={styles.settingsButton} onPress={() => router.push('/manage-phrases')}>
+                            <Ionicons name="settings-outline" size={24} color="#9333EA" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.settingsButton, showPictograms && styles.activeButton]}
+                            onPress={() => setShowPictograms(!showPictograms)}
+                        >
+                            <Ionicons
+                                name={showPictograms ? "images" : "images-outline"}
+                                size={24}
+                                color={showPictograms ? "#FFFFFF" : "#4A90E2"}
+                            />
+                        </TouchableOpacity>
+                        {user ? (
+                            <TouchableOpacity style={styles.settingsButton} onPress={handleLogout}>
+                                <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
+                            </TouchableOpacity>
+                        ) : (
+                            <TouchableOpacity style={styles.settingsButton} onPress={() => router.push('/login')}>
+                                <Ionicons name="log-in-outline" size={24} color="#4A90E2" />
+                            </TouchableOpacity>
+                        )}
+                    </View>
                 </View>
             )}
-
-            {/* Yellow Container - Pictograms and Buttons in same row */}
+            {showCompactHeader && (
+                <View style={styles.compactHeader}>
+                    <TouchableOpacity
+                        style={styles.compactButton}
+                        onPress={() => setShowCompactHeader(false)}
+                    >
+                        <Ionicons name="menu" size={20} color="#4A90E2" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.compactButton} onPress={() => router.push('/manage-phrases')}>
+                        <Ionicons name="settings-outline" size={20} color="#9333EA" />
+                    </TouchableOpacity>
+                </View>
+            )}
             {builtPhrase.pictograms.length > 0 && (
                 <View style={styles.builderContainer}>
                     <View style={styles.pictogramsRow}>
@@ -128,7 +169,7 @@ export default function MainScreen() {
                                     >
                                         <Ionicons name="close" size={16} color="#FFFFFF" />
                                     </TouchableOpacity>
-                                    <Image source={{ uri: pic.url }} style={styles.builtImage} />
+                                    <Image source={{ uri: pic.base64 || pic.url }} style={styles.builtImage} />
                                 </View>
                             ))}
                         </ScrollView>
@@ -140,21 +181,26 @@ export default function MainScreen() {
                                 onPress={handlePlay}
                                 disabled={!builtPhrase.text}
                             >
-                                <Ionicons name="play-outline" size={20} color="#4A90E2" />
+                                <Ionicons name="play-outline" size={60} color="#4A90E2" />
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={styles.iconButton}
                                 onPress={handleClear}
                                 disabled={!builtPhrase.text}
                             >
-                                <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
+                                <Ionicons name="trash-outline" size={60} color="#FF6B6B" />
                             </TouchableOpacity>
                         </View>
                     </View>
                 </View>
             )}
-
-            {/* Search Input */}
+            {!!builtPhrase.text && (
+                <View style={styles.builtTextRow}>
+                    <Text style={styles.builtText}>
+                        {builtPhrase.text}
+                    </Text>
+                </View>
+            )}
             <View style={styles.searchContainer}>
                 <View style={styles.searchBar}>
                     <TextInput
@@ -162,22 +208,21 @@ export default function MainScreen() {
                         style={styles.searchInput}
                         placeholder="Escribe lo que quieras decir..."
                         value={searchQuery}
-                        onChangeText={setSearchQuery}
+                        onChangeText={handleSearchChange}
                         autoCapitalize="characters"
                     />
                     {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchQuery('')}>
+                        <TouchableOpacity onPress={() => handleSearchChange('')}>
                             <Ionicons name="close-circle" size={20} color="#999" />
                         </TouchableOpacity>
                     )}
                 </View>
             </View>
-
-            {/* Suggestions List (Text Only) */}
             <View style={styles.resultsContainer}>
                 <FlatList
                     data={filteredPhrases}
                     keyExtractor={(item) => item.id}
+                    scrollEventThrottle={16}
                     renderItem={({ item, index }) => (
                         <TouchableOpacity
                             style={[
@@ -191,7 +236,20 @@ export default function MainScreen() {
                             onMouseEnter={() => setHoveredIndex(index)}
                             onMouseLeave={() => setHoveredIndex(null)}
                         >
-                            <Text style={styles.suggestionText}>{item.text}</Text>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.suggestionText}>{item.text}</Text>
+                                {showPictograms && item.pictograms && item.pictograms.length > 0 && (
+                                    <View style={styles.suggestionPictograms}>
+                                        {item.pictograms.map((pic, idx) => (
+                                            <Image
+                                                key={idx}
+                                                source={{ uri: pic.base64 || pic.url }}
+                                                style={styles.suggestionImage}
+                                            />
+                                        ))}
+                                    </View>
+                                )}
+                            </View>
                             <Ionicons name="add-circle-outline" size={24} color="#4A90E2" />
                         </TouchableOpacity>
                     )}
@@ -210,7 +268,7 @@ export default function MainScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8F9FA',
+        backgroundColor: 'purple',
     },
     header: {
         flexDirection: 'row',
@@ -218,14 +276,30 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 20,
         paddingVertical: 16,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '',
         borderBottomWidth: 0,
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+        boxShadow: '0 2px 8px rgba(117, 56, 109, 0.88)',
+    },
+    compactHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        backgroundColor: 'rgba(117, 56, 109, 0.41)',
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+        boxShadow: '0 1px 4px rgba(0, 0, 0, 0.05)',
+    },
+    compactButton: {
+        padding: 8,
+        backgroundColor: '#F0F4F8',
+        borderRadius: 8,
     },
     headerTitle: {
         fontSize: 26,
         fontWeight: '800',
-        color: '#1A1A1A',
+        color: '#FFFFFF',
         letterSpacing: -0.5,
     },
     settingsButton: {
@@ -237,25 +311,27 @@ const styles = StyleSheet.create({
         backgroundColor: '#FEF3C7',
         padding: 24,
         margin: 20,
+        marginBottom: 0,
         borderRadius: 24,
         boxShadow: '0 4px 12px rgba(147, 51, 234, 0.12)',
         borderWidth: 1,
         borderColor: 'rgba(147, 51, 234, 0.15)',
     },
     builtTextRow: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#ffffffff',
         paddingHorizontal: 20,
         paddingVertical: 16,
         marginHorizontal: 20,
-        marginTop: 12,
+        marginTop: 2,
+        marginBottom: 10,
         borderRadius: 16,
         borderWidth: 1,
-        borderColor: '#E8ECEF',
+        borderColor: 'purple',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
     },
     builtText: {
         fontSize: 22,
-        color: '#1A1A1A',
+        color: 'purple',
         lineHeight: 32,
         fontWeight: '500',
     },
@@ -302,16 +378,16 @@ const styles = StyleSheet.create({
     },
     removePictogramButton: {
         position: 'absolute',
-        top: -8,
-        right: -8,
-        zIndex: 10,
-        backgroundColor: '#EC4899',
-        borderRadius: 14,
-        width: 28,
-        height: 28,
+        bottom: -8,
+        left: 0,
+        backgroundColor: '#FF6B6B',
+        borderRadius: 12,
+        width: 24,
+        height: 24,
         justifyContent: 'center',
         alignItems: 'center',
-        boxShadow: '0 2px 4px rgba(236, 72, 153, 0.3)',
+        zIndex: 1,
+        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
     },
     builtImage: {
         width: 80,
@@ -330,13 +406,14 @@ const styles = StyleSheet.create({
         marginTop: 12,
     },
     controlButton: {
-        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 12,
+        gap: 8,
+        flex: 1,
         justifyContent: 'center',
-        padding: 16,
-        borderRadius: 16,
-        gap: 10,
         boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
     },
     playButton: {
@@ -344,40 +421,40 @@ const styles = StyleSheet.create({
     },
     clearButton: {
         backgroundColor: '#FFFFFF',
-        borderWidth: 2,
-        borderColor: '#EC4899',
-    },
-    buttonText: {
-        fontSize: 17,
-        fontWeight: '700',
-        color: 'white',
-        letterSpacing: 0.3,
-    },
-    clearText: {
-        color: '#EC4899',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
     },
     disabledButton: {
-        opacity: 0.4,
+        opacity: 0.5,
+    },
+    buttonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
+    clearText: {
+        color: '#E25C5C',
     },
     searchContainer: {
         paddingHorizontal: 20,
-        paddingBottom: 12,
+        marginBottom: 16,
     },
     searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#FFFFFF',
-        padding: 16,
-        borderRadius: 20,
-        borderWidth: 2,
-        borderColor: '#E8ECEF',
-        boxShadow: '0 2px 8px rgba(147, 51, 234, 0.08)',
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+        borderWidth: 1,
+        borderColor: '#F0F4F8',
     },
     searchInput: {
         flex: 1,
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#333333',
+        color: 'purple',
         padding: 10,
     },
     resultsContainer: {
@@ -385,38 +462,49 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
     },
     listContent: {
-        paddingBottom: 24,
+        paddingBottom: 20,
     },
     suggestionItem: {
         flexDirection: 'row',
-        alignItems: 'center',
         justifyContent: 'space-between',
+        alignItems: 'center',
         backgroundColor: '#FFFFFF',
         padding: 20,
+        marginBottom: 12,
         borderRadius: 16,
-        marginBottom: 3,
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
         borderWidth: 1,
-        borderColor: '#E8ECEF',
-        boxShadow: '0 1px 4px rgba(0, 0, 0, 0.05)',
+        borderColor: '#F0F4F8',
     },
     suggestionItemHovered: {
-        backgroundColor: '#EDE9FE',
-        borderColor: '#9333EA',
-        borderWidth: 2,
-        boxShadow: '0 2px 8px rgba(147, 51, 234, 0.3)',
+        backgroundColor: '#EDE9FE'
     },
     suggestionText: {
-        fontSize: 17,
-        color: '#333333',
-        flex: 1,
+        fontSize: 18,
+        color: 'purple',
         fontWeight: '500',
-        letterSpacing: -0.2,
     },
     emptyText: {
         textAlign: 'center',
         color: '#9CA3AF',
-        marginTop: 32,
-        fontSize: 17,
-        fontWeight: '500',
+        marginTop: 20,
+        fontSize: 16,
+    },
+    headerButtons: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    activeButton: {
+        backgroundColor: '#4A90E2',
+    },
+    suggestionPictograms: {
+        flexDirection: 'row',
+        marginTop: 8,
+        gap: 8,
+    },
+    suggestionImage: {
+        width: 40,
+        height: 40,
+        resizeMode: 'contain',
     },
 });

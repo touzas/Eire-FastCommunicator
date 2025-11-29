@@ -3,6 +3,7 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { AuthProvider } from '../src/context/AuthContext';
 import { PhrasesProvider } from '../src/context/PhrasesContext';
 
 SplashScreen.preventAutoHideAsync();
@@ -27,17 +28,14 @@ export default function RootLayout() {
   }
 
   return (
-    <PhrasesProvider>
-      <Stack>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="manage-phrases"
-          options={{
-            title: 'Gestionar Frases',
-            headerBackTitle: 'Atrás',
-          }}
-        />
-      </Stack>
-    </PhrasesProvider>
+    <AuthProvider>
+      <PhrasesProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="manage-phrases" />
+          <Stack.Screen name="login" options={{ presentation: 'modal' }} />
+        </Stack>
+      </PhrasesProvider>
+    </AuthProvider>
   );
 }

@@ -1,21 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
     Alert,
     FlatList,
-    SafeAreaView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { PhraseEditorModal } from '../src/components/PhraseEditorModal';
 import { PhraseItem } from '../src/components/PhraseItem';
 import { usePhrases } from '../src/context/PhrasesContext';
 import { Phrase, Pictogram } from '../src/types';
 
 export default function ManagePhrasesScreen() {
+    const router = useRouter();
     const { phrases, addPhrase, updatePhrase, deletePhrase } = usePhrases();
     const [searchQuery, setSearchQuery] = useState('');
     const [isModalVisible, setIsModalVisible] = useState(false);
@@ -69,6 +71,14 @@ export default function ManagePhrasesScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                    <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Gestionar Frases</Text>
+                <View style={{ width: 40 }} /> {/* Spacer for alignment */}
+            </View>
+
             <View style={styles.searchContainer}>
                 <View style={styles.searchBar}>
                     <Ionicons name="search" size={20} color="#666" />
@@ -89,13 +99,19 @@ export default function ManagePhrasesScreen() {
             <FlatList
                 data={filteredPhrases}
                 keyExtractor={(item) => item.id}
+                numColumns={2}
+                key={'grid-2'}
+                columnWrapperStyle={styles.row}
                 renderItem={({ item }) => (
-                    <PhraseItem
-                        phrase={item}
-                        showManageControls
-                        onEdit={() => handleEditPhrase(item)}
-                        onDelete={() => handleDeletePhrase(item)}
-                    />
+                    <View style={styles.gridItem}>
+                        <PhraseItem
+                            phrase={item}
+                            showManageControls
+                            onEdit={() => handleEditPhrase(item)}
+                            onDelete={() => handleDeletePhrase(item)}
+                            compact
+                        />
+                    </View>
                 )}
                 contentContainerStyle={styles.listContent}
                 ListEmptyComponent={
@@ -122,6 +138,24 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#f5f5f5',
     },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: 'white',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+    },
+    headerTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#1A1A1A',
+    },
+    backButton: {
+        padding: 8,
+    },
     searchContainer: {
         padding: 16,
         backgroundColor: 'white',
@@ -141,8 +175,16 @@ const styles = StyleSheet.create({
         fontSize: 16,
     },
     listContent: {
-        padding: 16,
+        padding: 8,
         paddingBottom: 80,
+    },
+    row: {
+        justifyContent: 'space-between',
+        paddingHorizontal: 8,
+    },
+    gridItem: {
+        width: '48%',
+        marginBottom: 12,
     },
     fab: {
         position: 'absolute',
