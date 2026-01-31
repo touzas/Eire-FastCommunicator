@@ -14,14 +14,12 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '../src/context/AuthContext';
 import { usePhrases } from '../src/context/PhrasesContext';
 import { Phrase, Pictogram } from '../src/types';
 
 export default function MainScreen() {
     const router = useRouter();
     const { phrases, updatePhraseUsage } = usePhrases();
-    const { user, signOut } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
     const [builtPhrase, setBuiltPhrase] = useState<{ text: string; pictograms: Pictogram[] }>({
         text: '',
@@ -62,23 +60,19 @@ export default function MainScreen() {
     };
 
     const addToBuilder = (phrase: Phrase) => {
-        setBuiltPhrase((prev) => {
-            // If the new phrase starts with the current text, just use the new phrase
-            if (prev.text && phrase.text.toLowerCase().startsWith(prev.text.toLowerCase())) {
-                return {
-                    text: phrase.text,
-                    pictograms: phrase.pictograms,
-                };
-            }
-
-            // Otherwise, append as normal
-            return {
-                text: prev.text ? `${prev.text} ${phrase.text}` : phrase.text,
-                pictograms: [...prev.pictograms, ...phrase.pictograms],
-            };
+        // Always replace the previous text with the new phrase
+        setBuiltPhrase({
+            text: phrase.text,
+            pictograms: phrase.pictograms,
         });
         updatePhraseUsage(phrase.id);
         setSearchQuery('');
+
+        // Auto-play if pictograms are hidden
+        if (!showPictograms) {
+            Speech.speak(phrase.text, { language: 'es-ES' });
+        }
+
         // Return focus to search input
         setTimeout(() => searchInputRef.current?.focus(), 100);
     };
@@ -97,11 +91,6 @@ export default function MainScreen() {
         const newPictograms = builtPhrase.pictograms.filter((_, index) => index !== indexToRemove);
         // Keep the text unchanged when removing pictograms
         setBuiltPhrase({ text: builtPhrase.text, pictograms: newPictograms });
-    };
-
-    const handleLogout = async () => {
-        await signOut();
-        router.replace('/login');
     };
 
     return (
@@ -126,15 +115,6 @@ export default function MainScreen() {
                                 color={showPictograms ? "#FFFFFF" : "#4A90E2"}
                             />
                         </TouchableOpacity>
-                        {user ? (
-                            <TouchableOpacity style={styles.settingsButton} onPress={handleLogout}>
-                                <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
-                            </TouchableOpacity>
-                        ) : (
-                            <TouchableOpacity style={styles.settingsButton} onPress={() => router.push('/login')}>
-                                <Ionicons name="log-in-outline" size={24} color="#4A90E2" />
-                            </TouchableOpacity>
-                        )}
                     </View>
                 </View>
             )}
@@ -151,7 +131,7 @@ export default function MainScreen() {
                     </TouchableOpacity>
                 </View>
             )}
-            {builtPhrase.pictograms.length > 0 && (
+            {builtPhrase.pictograms.length > 0 && showPictograms && (
                 <View style={styles.builderContainer}>
                     <View style={styles.pictogramsRow}>
                         {/* Pictograms on the left */}
@@ -201,6 +181,7 @@ export default function MainScreen() {
                     </Text>
                 </View>
             )}
+
             <View style={styles.searchContainer}>
                 <View style={styles.searchBar}>
                     <TextInput
@@ -335,6 +316,14 @@ const styles = StyleSheet.create({
         lineHeight: 32,
         fontWeight: '500',
     },
+    controlButtonsRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 12,
+        paddingHorizontal: 20,
+        paddingBottom: 10,
+    },
     pictogramsRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -346,23 +335,6 @@ const styles = StyleSheet.create({
     },
     iconButton: {
         padding: 4,
-    },
-    pictogramsLabel: {
-        fontSize: 14,
-        color: '#666',
-        fontWeight: '600',
-    },
-    pictogramsHeader: {
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    pictogramsStripContainer: {
-        marginBottom: 20,
-        paddingVertical: 12,
-        borderTopWidth: 2,
-        borderTopColor: '#F0F4F8',
     },
     pictogramsScroll: {
         flex: 1,
@@ -393,47 +365,6 @@ const styles = StyleSheet.create({
         width: 80,
         height: 80,
         resizeMode: 'contain',
-    },
-    pictogramWord: {
-        fontSize: 12,
-        color: '#333',
-        marginTop: 6,
-        fontWeight: '500',
-    },
-    builderControls: {
-        flexDirection: 'row',
-        gap: 16,
-        marginTop: 12,
-    },
-    controlButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 20,
-        borderRadius: 12,
-        gap: 8,
-        flex: 1,
-        justifyContent: 'center',
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-    },
-    playButton: {
-        backgroundColor: '#9333EA',
-    },
-    clearButton: {
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-    },
-    disabledButton: {
-        opacity: 0.5,
-    },
-    buttonText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#FFFFFF',
-    },
-    clearText: {
-        color: '#E25C5C',
     },
     searchContainer: {
         paddingHorizontal: 20,

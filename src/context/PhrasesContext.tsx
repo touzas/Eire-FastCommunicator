@@ -1,10 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { collection, deleteDoc, doc, onSnapshot, query, setDoc } from 'firebase/firestore';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { db } from '../firebaseConfig';
 import { Phrase, Pictogram } from '../types';
 import { urlToBase64 } from '../utils/imageUtils';
-import { useAuth } from './AuthContext';
 
 interface PhrasesContextType {
     phrases: Phrase[];
@@ -18,6 +15,10 @@ interface PhrasesContextType {
 const PhrasesContext = createContext<PhrasesContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'phrases_data';
+
+// TODO: Replace with your actual GitHub raw JSON URL
+// Example: 'https://raw.githubusercontent.com/user/repo/main/phrases.json'
+const REMOTE_JSON_URL = '';
 
 const DUMMY_DATA: Phrase[] = [
     {
@@ -51,68 +52,71 @@ const DUMMY_DATA: Phrase[] = [
 export const PhrasesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [phrases, setPhrases] = useState<Phrase[]>([]);
     const [loading, setLoading] = useState(true);
-    const { user } = useAuth();
+
+    const processPhrasesImages = async (phrasesList: Phrase[]): Promise<Phrase[]> => {
+        return await Promise.all(phrasesList.map(async (phrase) => {
+            const updatedPictograms = await Promise.all(phrase.pictograms.map(async (pic) => {
+                if (!pic.base64) {
+                    const base64 = await urlToBase64(pic.url);
+                    return { ...pic, base64: base64 || undefined };
+                }
+                return pic;
+            }));
+            return { ...phrase, pictograms: updatedPictograms };
+        }));
+    };
+
+    const fetchRemotePhrases = async (): Promise<Phrase[] | null> => {
+        if (!REMOTE_JSON_URL) return null;
+        try {
+            console.log('[PhrasesContext] Fetching remote phrases from:', REMOTE_JSON_URL);
+            const response = await fetch(REMOTE_JSON_URL);
+            if (!response.ok) throw new Error('Failed to fetch remote JSON');
+            const data = await response.json();
+            return data as Phrase[];
+        } catch (error) {
+            console.error('[PhrasesContext] Error fetching remote phrases:', error);
+            return null;
+        }
+    };
 
     useEffect(() => {
-        let unsubscribe: (() => void) | undefined;
-
         const initPhrases = async () => {
             setLoading(true);
             try {
-                if (user && db) {
-                    // Firestore Mode
-                    const q = query(collection(db, 'users', user.uid, 'phrases'));
-                    unsubscribe = onSnapshot(q, async (snapshot) => {
-                        const remotePhrases: Phrase[] = [];
-                        snapshot.forEach((doc) => {
-                            remotePhrases.push(doc.data() as Phrase);
-                        });
+                // 1. Try to load from Local Storage
+                const storedData = await AsyncStorage.getItem(STORAGE_KEY);
+                let currentPhrases: Phrase[] = storedData ? JSON.parse(storedData) : [];
 
-                        // Process images for offline storage (Base64)
-                        const processedPhrases = await Promise.all(remotePhrases.map(async (phrase) => {
-                            const updatedPictograms = await Promise.all(phrase.pictograms.map(async (pic) => {
-                                if (!pic.base64) {
-                                    const base64 = await urlToBase64(pic.url);
-                                    return { ...pic, base64: base64 || undefined };
-                                }
-                                return pic;
-                            }));
-                            return { ...phrase, pictograms: updatedPictograms };
-                        }));
-
-                        setPhrases(processedPhrases);
-                        setLoading(false);
-
-                        // Sync to local storage for offline backup
-                        AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(processedPhrases)).catch(err => {
-                            console.error('Error syncing to local storage:', err);
-                        });
-                    }, (error) => {
-                        console.error("Firestore error:", error);
-                        // Fallback to local storage on error
-                        loadLocalPhrases();
+                // 2. Try to fetch from Remote (GitHub) and merge if available
+                const remotePhrases = await fetchRemotePhrases();
+                if (remotePhrases) {
+                    console.log('[PhrasesContext] Merging remote phrases');
+                    // Simple merge strategy: use remote as base, keep local ones if they don't exist in remote
+                    const phraseMap = new Map<string, Phrase>();
+                    remotePhrases.forEach(p => phraseMap.set(p.id, p));
+                    currentPhrases.forEach(p => {
+                        if (!phraseMap.has(p.id)) {
+                            phraseMap.set(p.id, p);
+                        }
                     });
-                } else {
-                    // Local Storage Mode
-                    await loadLocalPhrases();
+                    currentPhrases = Array.from(phraseMap.values());
                 }
-            } catch (error) {
-                console.error('Error initializing phrases:', error);
-                await loadLocalPhrases();
-            }
-        };
 
-        const loadLocalPhrases = async () => {
-            try {
-                const storedPhrases = await AsyncStorage.getItem(STORAGE_KEY);
-                if (storedPhrases) {
-                    setPhrases(JSON.parse(storedPhrases));
-                } else {
-                    setPhrases(DUMMY_DATA);
-                    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(DUMMY_DATA));
+                // 3. Fallback to dummy data if empty
+                if (currentPhrases.length === 0) {
+                    currentPhrases = DUMMY_DATA;
                 }
+
+                // 4. Process images (Base64) for offline use
+                const processed = await processPhrasesImages(currentPhrases);
+                setPhrases(processed);
+
+                // 5. Save back to AsyncStorage
+                await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(processed));
+
             } catch (error) {
-                console.error('Error loading local phrases:', error);
+                console.error('[PhrasesContext] Initialization error:', error);
                 setPhrases(DUMMY_DATA);
             } finally {
                 setLoading(false);
@@ -120,16 +124,9 @@ export const PhrasesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         };
 
         initPhrases();
-
-        return () => {
-            if (unsubscribe) {
-                unsubscribe();
-            }
-        };
-    }, [user]);
+    }, []);
 
     const addPhrase = async (text: string, pictograms: Pictogram[]) => {
-        // Convert images to Base64 first
         const processedPictograms = await Promise.all(pictograms.map(async (pic) => {
             const base64 = await urlToBase64(pic.url);
             return { ...pic, base64: base64 || undefined };
@@ -142,35 +139,15 @@ export const PhrasesProvider: React.FC<{ children: React.ReactNode }> = ({ child
             usage_count: 0,
         };
 
-        if (user && db) {
-            // Save to Firestore
-            const phraseRef = doc(db, 'users', user.uid, 'phrases', newPhrase.id);
-            setDoc(phraseRef, newPhrase).catch(error => {
-                console.error('Error adding phrase to Firestore:', error);
-                // Fallback to local
-                saveLocalPhrase(newPhrase);
-            });
-        } else {
-            // Save to local storage
-            saveLocalPhrase(newPhrase);
-        }
-    };
-
-    const saveLocalPhrase = async (newPhrase: Phrase) => {
-        try {
-            const updatedPhrases = [...phrases, newPhrase];
-            setPhrases(updatedPhrases);
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPhrases));
-        } catch (error) {
-            console.error('Error saving phrase locally:', error);
-        }
+        const updatedPhrases = [...phrases, newPhrase];
+        setPhrases(updatedPhrases);
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPhrases));
     };
 
     const updatePhrase = async (id: string, text: string, pictograms: Pictogram[]) => {
-        const updatedPhrase = phrases.find(p => p.id === id);
-        if (!updatedPhrase) return;
+        const phraseToUpdate = phrases.find(p => p.id === id);
+        if (!phraseToUpdate) return;
 
-        // Convert images if needed
         const processedPictograms = await Promise.all(pictograms.map(async (pic) => {
             if (!pic.base64) {
                 const base64 = await urlToBase64(pic.url);
@@ -179,71 +156,25 @@ export const PhrasesProvider: React.FC<{ children: React.ReactNode }> = ({ child
             return pic;
         }));
 
-        const newPhrase = { ...updatedPhrase, text, pictograms: processedPictograms };
+        const updatedPhrase = { ...phraseToUpdate, text, pictograms: processedPictograms };
+        const updatedPhrases = phrases.map(p => p.id === id ? updatedPhrase : p);
 
-        if (user && db) {
-            // Update in Firestore
-            const phraseRef = doc(db, 'users', user.uid, 'phrases', id);
-            setDoc(phraseRef, newPhrase).catch(error => {
-                console.error('Error updating phrase in Firestore:', error);
-                updateLocalPhrase(id, newPhrase);
-            });
-        } else {
-            // Update in local storage
-            updateLocalPhrase(id, newPhrase);
-        }
+        setPhrases(updatedPhrases);
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPhrases));
     };
 
-    const updateLocalPhrase = async (id: string, newPhrase: Phrase) => {
-        try {
-            const updatedPhrases = phrases.map(p => p.id === id ? newPhrase : p);
-            setPhrases(updatedPhrases);
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPhrases));
-        } catch (error) {
-            console.error('Error updating phrase locally:', error);
-        }
+    const deletePhrase = async (id: string) => {
+        const updatedPhrases = phrases.filter(p => p.id !== id);
+        setPhrases(updatedPhrases);
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPhrases));
     };
 
-    const deletePhrase = (id: string) => {
-        if (user && db) {
-            // Delete from Firestore
-            const phraseRef = doc(db, 'users', user.uid, 'phrases', id);
-            deleteDoc(phraseRef).catch(error => {
-                console.error('Error deleting phrase from Firestore:', error);
-                deleteLocalPhrase(id);
-            });
-        } else {
-            // Delete from local storage
-            deleteLocalPhrase(id);
-        }
-    };
-
-    const deleteLocalPhrase = async (id: string) => {
-        try {
-            const updatedPhrases = phrases.filter(p => p.id !== id);
-            setPhrases(updatedPhrases);
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPhrases));
-        } catch (error) {
-            console.error('Error deleting phrase locally:', error);
-        }
-    };
-
-    const updatePhraseUsage = (id: string) => {
-        const phrase = phrases.find(p => p.id === id);
-        if (!phrase) return;
-
-        const updatedPhrase = { ...phrase, usage_count: phrase.usage_count + 1 };
-
-        if (user && db) {
-            // Update in Firestore
-            const phraseRef = doc(db, 'users', user.uid, 'phrases', id);
-            setDoc(phraseRef, updatedPhrase).catch(error => {
-                console.error('Error updating usage in Firestore:', error);
-            });
-        } else {
-            // Update in local storage
-            updateLocalPhrase(id, updatedPhrase);
-        }
+    const updatePhraseUsage = async (id: string) => {
+        const updatedPhrases = phrases.map(p =>
+            p.id === id ? { ...p, usage_count: p.usage_count + 1 } : p
+        );
+        setPhrases(updatedPhrases);
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPhrases));
     };
 
     return (
