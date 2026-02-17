@@ -44,7 +44,7 @@ export const PhrasesProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const resetPhrases = async () => {
         setLoading(true);
-        await removeData(STORAGE_KEY);
+        // Reset to ONLY defaults
         const processed = await processPhrasesImages(DUMMY_DATA);
         setPhrases(processed);
         await saveData(STORAGE_KEY, processed);
@@ -55,20 +55,21 @@ export const PhrasesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const initPhrases = async () => {
             setLoading(true);
             try {
-                const storedPhrases = await loadData<Phrase[]>(STORAGE_KEY);
+                const storedPhrases = await loadData<Phrase[]>(STORAGE_KEY) || [];
 
-                let currentPhrases: Phrase[];
-                if (storedPhrases === null) {
-                    console.log('[PhrasesContext] No stored data found, using defaults.');
-                    currentPhrases = DUMMY_DATA;
-                } else {
-                    currentPhrases = storedPhrases;
-                }
+                // Merge logic:
+                // 1. Keep everything from local storage (including user modifications to default phrases)
+                // 2. Add phrases from DUMMY_DATA that are NOT already in local storage by ID
+                const storedIds = new Set(storedPhrases.map(p => p.id));
+                const newFromDefaults = DUMMY_DATA.filter(p => !storedIds.has(p.id));
 
-                const processed = await processPhrasesImages(currentPhrases);
+                const mergedPhrases = [...storedPhrases, ...newFromDefaults];
+
+                const processed = await processPhrasesImages(mergedPhrases);
                 setPhrases(processed);
 
-                if (storedPhrases === null) {
+                // If we found new phrases in defaults, update storage
+                if (newFromDefaults.length > 0) {
                     await saveData(STORAGE_KEY, processed);
                 }
 
