@@ -1,0 +1,46 @@
+[
+    {
+        "id": "1",
+        "text": "Quiero agua",
+        "usage_count": 0,
+        "type": "phrase",
+        "pictograms": [
+            {
+                "word": "Quiero",
+                "url": "https://api.arasaac.org/api/pictograms/36994"
+            },
+            {
+                "word": "agua",
+                "url": "https://api.arasaac.org/api/pictograms/2349"
+            }
+        ]
+    },
+    {
+        "id": "2",
+        "text": "Tengo hambre",
+        "usage_count": 0,
+        "type": "phrase",
+        "pictograms": [
+            {
+                "word": "Tengo",
+                "url": "https://api.arasaac.org/api/pictograms/36994"
+            },
+            {
+                "word": "hambre",
+                "url": "https://api.arasaac.org/api/pictograms/5486"
+            }
+        ]
+    },
+    {
+        "id": "3",
+        "text": "Hola",
+        "usage_count": 0,
+        "type": "word",
+        "pictograms": [
+            {
+                "word": "Hola",
+                "url": "https://api.arasaac.org/api/pictograms/5510"
+            }
+        ]
+    }
+]
