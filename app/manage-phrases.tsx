@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
     Alert,
     FlatList,
+    Modal,
     StyleSheet,
     Text,
     TextInput,
@@ -16,12 +18,16 @@ import { PhraseItem } from '../src/components/PhraseItem';
 import { usePhrases } from '../src/context/PhrasesContext';
 import { Phrase, Pictogram } from '../src/types';
 
+import { isTablet, moderateScale, scale } from '../src/utils/responsive';
+
 export default function ManagePhrasesScreen() {
     const router = useRouter();
     const { phrases, addPhrase, updatePhrase, deletePhrase } = usePhrases();
     const [searchQuery, setSearchQuery] = useState('');
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [editingPhrase, setEditingPhrase] = useState<Phrase | null>(null);
+    const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
+    const [phraseToDelete, setPhraseToDelete] = useState<Phrase | null>(null);
 
     const filteredPhrases = useMemo(() => {
         let result = phrases;
@@ -32,8 +38,8 @@ export default function ManagePhrasesScreen() {
                 return phraseText.includes(query);
             });
         }
-        // Sort by usage count descending
-        return result.sort((a, b) => b.usage_count - a.usage_count);
+        // Create a new array before sorting to avoid mutating the original phrases state
+        return [...result].sort((a, b) => b.usage_count - a.usage_count);
     }, [phrases, searchQuery]);
 
     const handleAddPhrase = () => {
@@ -47,41 +53,61 @@ export default function ManagePhrasesScreen() {
     };
 
     const handleDeletePhrase = (phrase: Phrase) => {
+        setPhraseToDelete(phrase);
+        setIsDeleteModalVisible(true);
+    };
+
+    const confirmDelete = () => {
+        if (phraseToDelete) {
+            deletePhrase(phraseToDelete.id);
+            setIsDeleteModalVisible(false);
+            setPhraseToDelete(null);
+        }
+    };
+
+    const handleSavePhrase = (text: string, pictograms: Pictogram[], type: 'word' | 'phrase') => {
+        if (editingPhrase) {
+            updatePhrase(editingPhrase.id, text, pictograms, type);
+        } else {
+            addPhrase(text, pictograms, type);
+        }
+    };
+
+    const handleClearCache = () => {
         Alert.alert(
-            'Eliminar Frase',
-            `¿Estás seguro de que quieres eliminar "${phrase.text}"?`,
+            'Limpiar Caché',
+            'Esto recargará las frases desde el archivo base. Los cambios no guardados se perderán. ¿Continuar?',
             [
                 { text: 'Cancelar', style: 'cancel' },
                 {
-                    text: 'Eliminar',
+                    text: 'Limpiar',
                     style: 'destructive',
-                    onPress: () => deletePhrase(phrase.id),
+                    onPress: async () => {
+                        await AsyncStorage.removeItem('phrases_data');
+                        Alert.alert('Éxito', 'Caché limpiado. Por favor, reinicia la aplicación para cargar los datos frescos.');
+                    },
                 },
             ]
         );
     };
 
-    const handleSavePhrase = (text: string, pictograms: Pictogram[]) => {
-        if (editingPhrase) {
-            updatePhrase(editingPhrase.id, text, pictograms);
-        } else {
-            addPhrase(text, pictograms);
-        }
-    };
+    const numColumns = isTablet() ? 3 : 2;
 
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
+                    <Ionicons name="arrow-back" size={scale(24)} color="#1A1A1A" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Gestionar Frases</Text>
-                <View style={{ width: 40 }} /> {/* Spacer for alignment */}
+                <TouchableOpacity onPress={handleClearCache} style={styles.backButton}>
+                    <Ionicons name="refresh" size={scale(24)} color="#4A90E2" />
+                </TouchableOpacity>
             </View>
 
             <View style={styles.searchContainer}>
                 <View style={styles.searchBar}>
-                    <Ionicons name="search" size={20} color="#666" />
+                    <Ionicons name="search" size={scale(20)} color="#666" />
                     <TextInput
                         style={styles.searchInput}
                         placeholder="Buscar frases..."
@@ -90,20 +116,20 @@ export default function ManagePhrasesScreen() {
                     />
                     {searchQuery.length > 0 && (
                         <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <Ionicons name="close-circle" size={20} color="#999" />
+                            <Ionicons name="close-circle" size={scale(20)} color="#999" />
                         </TouchableOpacity>
                     )}
                 </View>
             </View>
 
             <FlatList
+                key={isTablet() ? 'tablet-grid' : 'mobile-grid'}
                 data={filteredPhrases}
                 keyExtractor={(item) => item.id}
-                numColumns={2}
-                key={'grid-2'}
+                numColumns={numColumns}
                 columnWrapperStyle={styles.row}
                 renderItem={({ item }) => (
-                    <View style={styles.gridItem}>
+                    <View style={[styles.gridItem, { width: `${96 / numColumns}%` }]}>
                         <PhraseItem
                             phrase={item}
                             showManageControls
@@ -120,7 +146,7 @@ export default function ManagePhrasesScreen() {
             />
 
             <TouchableOpacity style={styles.fab} onPress={handleAddPhrase}>
-                <Ionicons name="add" size={30} color="white" />
+                <Ionicons name="add" size={scale(30)} color="white" />
             </TouchableOpacity>
 
             <PhraseEditorModal
@@ -129,6 +155,38 @@ export default function ManagePhrasesScreen() {
                 onSave={handleSavePhrase}
                 initialPhrase={editingPhrase}
             />
+
+            {/* Custom Delete Confirmation Modal */}
+            <Modal
+                transparent
+                visible={isDeleteModalVisible}
+                animationType="fade"
+                onRequestClose={() => setIsDeleteModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.confirmModal}>
+                        <Ionicons name="trash-outline" size={scale(48)} color="#E25C5C" style={styles.modalIcon} />
+                        <Text style={styles.modalTitle}>¿Eliminar frase?</Text>
+                        <Text style={styles.modalMessage}>
+                            Estás a punto de eliminar "{phraseToDelete?.text}". Esta acción no se puede deshacer.
+                        </Text>
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.cancelButton]}
+                                onPress={() => setIsDeleteModalVisible(false)}
+                            >
+                                <Text style={styles.cancelButtonText}>Cancelar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.deleteConfirmButton]}
+                                onPress={confirmDelete}
+                            >
+                                <Text style={styles.deleteButtonText}>Eliminar</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -142,22 +200,22 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingHorizontal: scale(16),
+        paddingVertical: scale(12),
         backgroundColor: 'white',
         borderBottomWidth: 1,
         borderBottomColor: '#e0e0e0',
     },
     headerTitle: {
-        fontSize: 20,
+        fontSize: moderateScale(20),
         fontWeight: 'bold',
         color: '#1A1A1A',
     },
     backButton: {
-        padding: 8,
+        padding: scale(8),
     },
     searchContainer: {
-        padding: 16,
+        padding: scale(16),
         backgroundColor: 'white',
         borderBottomWidth: 1,
         borderBottomColor: '#e0e0e0',
@@ -166,34 +224,33 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#f5f5f5',
-        padding: 10,
-        borderRadius: 10,
+        padding: scale(10),
+        borderRadius: scale(10),
     },
     searchInput: {
         flex: 1,
-        marginLeft: 8,
-        fontSize: 16,
+        marginLeft: scale(8),
+        fontSize: moderateScale(16),
     },
     listContent: {
-        padding: 8,
-        paddingBottom: 80,
+        padding: scale(10),
+        paddingBottom: scale(80),
     },
     row: {
         justifyContent: 'space-between',
-        paddingHorizontal: 8,
+        paddingHorizontal: scale(8),
     },
     gridItem: {
-        width: '48%',
-        marginBottom: 12,
+        marginBottom: scale(12),
     },
     fab: {
         position: 'absolute',
-        bottom: 24,
-        right: 24,
+        bottom: scale(24),
+        right: scale(24),
         backgroundColor: '#4A90E2',
-        width: 56,
-        height: 56,
-        borderRadius: 28,
+        width: scale(56),
+        height: scale(56),
+        borderRadius: scale(28),
         justifyContent: 'center',
         alignItems: 'center',
         boxShadow: '0 4px 4px rgba(0, 0, 0, 0.3)',
@@ -201,7 +258,67 @@ const styles = StyleSheet.create({
     emptyText: {
         textAlign: 'center',
         color: '#999',
-        marginTop: 40,
-        fontSize: 16,
+        marginTop: scale(40),
+        fontSize: moderateScale(16),
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: scale(20),
+    },
+    confirmModal: {
+        backgroundColor: 'white',
+        borderRadius: scale(24),
+        padding: scale(24),
+        width: '85%',
+        maxWidth: scale(340),
+        alignItems: 'center',
+        boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+    },
+    modalIcon: {
+        marginBottom: scale(12),
+    },
+    modalTitle: {
+        fontSize: moderateScale(20),
+        fontWeight: '800',
+        color: '#1A1A1A',
+        marginBottom: scale(8),
+        textAlign: 'center',
+    },
+    modalMessage: {
+        fontSize: moderateScale(15),
+        color: '#4B5563',
+        textAlign: 'center',
+        marginBottom: scale(24),
+        lineHeight: moderateScale(22),
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        gap: scale(12),
+        width: '100%',
+    },
+    modalButton: {
+        flex: 1,
+        paddingVertical: scale(12),
+        borderRadius: scale(14),
+        alignItems: 'center',
+    },
+    cancelButton: {
+        backgroundColor: '#F3F4F6',
+    },
+    deleteConfirmButton: {
+        backgroundColor: '#EF4444',
+    },
+    cancelButtonText: {
+        color: '#4B5563',
+        fontSize: moderateScale(15),
+        fontWeight: '700',
+    },
+    deleteButtonText: {
+        color: 'white',
+        fontSize: moderateScale(15),
+        fontWeight: '700',
     },
 });

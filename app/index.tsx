@@ -16,10 +16,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePhrases } from '../src/context/PhrasesContext';
 import { Phrase, Pictogram } from '../src/types';
+import { moderateScale, scale } from '../src/utils/responsive';
 
 export default function MainScreen() {
     const router = useRouter();
-    const { phrases, updatePhraseUsage } = usePhrases();
+    const { phrases, updatePhraseUsage, addPhrase } = usePhrases();
     const [searchQuery, setSearchQuery] = useState('');
     const [builtPhrase, setBuiltPhrase] = useState<{ text: string; pictograms: Pictogram[] }>({
         text: '',
@@ -28,7 +29,24 @@ export default function MainScreen() {
     const searchInputRef = React.useRef<TextInput>(null);
     const [hoveredIndex, setHoveredIndex] = React.useState<number | null>(null);
     const [showPictograms, setShowPictograms] = useState(false);
-    const [showCompactHeader, setShowCompactHeader] = useState(false);
+    const [language, setLanguage] = useState<'en' | 'es'>('es');
+    const [layoutMode, setLayoutMode] = useState<'top' | 'bottom'>('top');
+
+    // Translations
+    const translations = {
+        en: {
+            placeholder: 'Type what you want to say...',
+            noResults: 'No phrases found.',
+            addPhrase: 'Add as Phrase',
+            addWord: 'Add as Word',
+        },
+        es: {
+            placeholder: 'Escribe lo que quieras decir...',
+            noResults: 'No se encontraron frases.',
+            addPhrase: 'Añadir como Frase',
+            addWord: 'Añadir como Palabra',
+        },
+    };
 
 
     const filteredPhrases = useMemo(() => {
@@ -51,26 +69,34 @@ export default function MainScreen() {
 
     const handleSearchChange = (text: string) => {
         setSearchQuery(text);
-        // Mostrar cabecera compacta cuando el usuario empieza a escribir
-        if (text.length > 0) {
-            setShowCompactHeader(true);
-        } else {
-            setShowCompactHeader(false);
-        }
     };
 
     const addToBuilder = (phrase: Phrase) => {
-        // Always replace the previous text with the new phrase
-        setBuiltPhrase({
-            text: phrase.text,
-            pictograms: phrase.pictograms,
-        });
+        const isWord = phrase.type === 'word';
+
+        if (isWord && builtPhrase.text) {
+            // Append word with space
+            setBuiltPhrase({
+                text: builtPhrase.text + ' ' + phrase.text,
+                pictograms: [...builtPhrase.pictograms, ...phrase.pictograms],
+            });
+        } else {
+            // Replace (phrase or first word)
+            setBuiltPhrase({
+                text: phrase.text,
+                pictograms: phrase.pictograms,
+            });
+        }
+
         updatePhraseUsage(phrase.id);
         setSearchQuery('');
 
         // Auto-play if pictograms are hidden
         if (!showPictograms) {
-            Speech.speak(phrase.text, { language: 'es-ES' });
+            const textToSpeak = isWord && builtPhrase.text
+                ? builtPhrase.text + ' ' + phrase.text
+                : phrase.text;
+            Speech.speak(textToSpeak, { language: language === 'en' ? 'en-US' : 'es-ES' });
         }
 
         // Return focus to search input
@@ -79,7 +105,7 @@ export default function MainScreen() {
 
     const handlePlay = () => {
         if (builtPhrase.text) {
-            Speech.speak(builtPhrase.text, { language: 'es-ES' });
+            Speech.speak(builtPhrase.text, { language: language === 'en' ? 'en-US' : 'es-ES' });
         }
     };
 
@@ -93,44 +119,55 @@ export default function MainScreen() {
         setBuiltPhrase({ text: builtPhrase.text, pictograms: newPictograms });
     };
 
+    const handleQuickAdd = async (text: string, type: 'word' | 'phrase') => {
+        const newPhrase = await addPhrase(text, [], type);
+        addToBuilder(newPhrase);
+    };
+
+    const handleSearchSubmit = () => {
+        if (!searchQuery.trim()) return;
+
+        const query = searchQuery.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const exactMatch = filteredPhrases.find(p =>
+            p.text.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === query
+        );
+
+        if (exactMatch) {
+            addToBuilder(exactMatch);
+        } else {
+            handleQuickAdd(searchQuery.trim(), 'phrase');
+        }
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" />
-            {!showCompactHeader && (
-                <View style={styles.header}>
-                    <View>
-                        <Text style={styles.headerTitle}>Eire Fast Conversation</Text>
-                    </View>
-                    <View style={styles.headerButtons}>
-                        <TouchableOpacity style={styles.settingsButton} onPress={() => router.push('/manage-phrases')}>
-                            <Ionicons name="settings-outline" size={24} color="#9333EA" />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.settingsButton, showPictograms && styles.activeButton]}
-                            onPress={() => setShowPictograms(!showPictograms)}
-                        >
-                            <Ionicons
-                                name={showPictograms ? "images" : "images-outline"}
-                                size={24}
-                                color={showPictograms ? "#FFFFFF" : "#4A90E2"}
-                            />
-                        </TouchableOpacity>
-                    </View>
+            <View style={styles.header}>
+                <View>
+                    <Text style={styles.headerTitle}>Eire Fast Conversation</Text>
                 </View>
-            )}
-            {showCompactHeader && (
-                <View style={styles.compactHeader}>
+                <View style={styles.headerButtons}>
+                    <TouchableOpacity style={styles.settingsButton} onPress={() => router.push('/manage-phrases')}>
+                        <Ionicons name="settings-outline" size={scale(20)} color="#9333EA" />
+                    </TouchableOpacity>
                     <TouchableOpacity
-                        style={styles.compactButton}
-                        onPress={() => setShowCompactHeader(false)}
+                        style={styles.settingsButton}
+                        onPress={() => setLayoutMode(layoutMode === 'top' ? 'bottom' : 'top')}
                     >
-                        <Ionicons name="menu" size={20} color="#4A90E2" />
+                        <Ionicons name="swap-vertical-outline" size={scale(20)} color="#FF6B6B" />
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.compactButton} onPress={() => router.push('/manage-phrases')}>
-                        <Ionicons name="settings-outline" size={20} color="#9333EA" />
+                    <TouchableOpacity
+                        style={[styles.settingsButton, showPictograms && styles.activeButton]}
+                        onPress={() => setShowPictograms(!showPictograms)}
+                    >
+                        <Ionicons
+                            name={showPictograms ? "images" : "images-outline"}
+                            size={scale(20)}
+                            color={showPictograms ? "#FFFFFF" : "#4A90E2"}
+                        />
                     </TouchableOpacity>
                 </View>
-            )}
+            </View>
             {builtPhrase.pictograms.length > 0 && showPictograms && (
                 <View style={styles.builderContainer}>
                     <View style={styles.pictogramsRow}>
@@ -182,66 +219,210 @@ export default function MainScreen() {
                 </View>
             )}
 
-            <View style={styles.searchContainer}>
-                <View style={styles.searchBar}>
-                    <TextInput
-                        ref={searchInputRef}
-                        style={styles.searchInput}
-                        placeholder="Escribe lo que quieras decir..."
-                        value={searchQuery}
-                        onChangeText={handleSearchChange}
-                        autoCapitalize="characters"
-                    />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => handleSearchChange('')}>
-                            <Ionicons name="close-circle" size={20} color="#999" />
-                        </TouchableOpacity>
-                    )}
-                </View>
-            </View>
-            <View style={styles.resultsContainer}>
-                <FlatList
-                    data={filteredPhrases}
-                    keyExtractor={(item) => item.id}
-                    scrollEventThrottle={16}
-                    renderItem={({ item, index }) => (
-                        <TouchableOpacity
-                            style={[
-                                styles.suggestionItem,
-                                hoveredIndex === index && styles.suggestionItemHovered
-                            ]}
-                            onPress={() => addToBuilder(item)}
-                            onPressIn={() => setHoveredIndex(index)}
-                            onPressOut={() => setHoveredIndex(null)}
-                            // @ts-ignore - Web-specific hover events
-                            onMouseEnter={() => setHoveredIndex(index)}
-                            onMouseLeave={() => setHoveredIndex(null)}
-                        >
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.suggestionText}>{item.text}</Text>
-                                {showPictograms && item.pictograms && item.pictograms.length > 0 && (
-                                    <View style={styles.suggestionPictograms}>
-                                        {item.pictograms.map((pic, idx) => (
-                                            <Image
-                                                key={idx}
-                                                source={{ uri: pic.base64 || pic.url }}
-                                                style={styles.suggestionImage}
-                                            />
-                                        ))}
+
+            {/* Layout Mode: TOP (default) - Built phrase at top, search in middle, results at bottom */}
+            {layoutMode === 'top' && (
+                <>
+                    <View style={styles.searchContainer}>
+                        <View style={styles.searchBar}>
+                            <TextInput
+                                ref={searchInputRef}
+                                style={styles.searchInput}
+                                placeholder={translations[language].placeholder}
+                                value={searchQuery}
+                                onChangeText={handleSearchChange}
+                                onSubmitEditing={handleSearchSubmit}
+                                blurOnSubmit={false}
+                                autoCapitalize="characters"
+                            />
+                            {searchQuery.length > 0 && (
+                                <TouchableOpacity onPress={() => handleSearchChange('')}>
+                                    <Ionicons name="close-circle" size={20} color="#999" />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    </View>
+                    <View style={styles.resultsContainer}>
+                        <FlatList
+                            data={filteredPhrases}
+                            keyExtractor={(item) => item.id}
+                            scrollEventThrottle={16}
+                            renderItem={({ item, index }) => (
+                                <TouchableOpacity
+                                    style={[
+                                        styles.suggestionItem,
+                                        hoveredIndex === index && styles.suggestionItemHovered
+                                    ]}
+                                    onPress={() => addToBuilder(item)}
+                                    onPressIn={() => setHoveredIndex(index)}
+                                    onPressOut={() => setHoveredIndex(null)}
+                                    // @ts-ignore - Web-specific hover events
+                                    onMouseEnter={() => setHoveredIndex(index)}
+                                    onMouseLeave={() => setHoveredIndex(null)}
+                                >
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: scale(8) }}>
+                                            <Text style={styles.suggestionText}>{item.text}</Text>
+                                            {item.type === 'word' && (
+                                                <View style={styles.wordBadge}>
+                                                    <Text style={styles.wordBadgeText}>+</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                        {showPictograms && item.pictograms && item.pictograms.length > 0 && (
+                                            <View style={styles.suggestionPictograms}>
+                                                {item.pictograms.map((pic, idx) => (
+                                                    <Image
+                                                        key={idx}
+                                                        source={{ uri: pic.base64 || pic.url }}
+                                                        style={styles.suggestionImage}
+                                                    />
+                                                ))}
+                                            </View>
+                                        )}
                                     </View>
-                                )}
-                            </View>
-                            <Ionicons name="add-circle-outline" size={24} color="#4A90E2" />
-                        </TouchableOpacity>
-                    )}
-                    ListEmptyComponent={
-                        searchQuery ? (
-                            <Text style={styles.emptyText}>No se encontraron frases.</Text>
-                        ) : null
-                    }
-                    contentContainerStyle={styles.listContent}
-                />
-            </View>
+                                    <Ionicons
+                                        name={item.type === 'word' ? "add-circle-outline" : "arrow-forward-circle-outline"}
+                                        size={24}
+                                        color="#4A90E2"
+                                    />
+                                </TouchableOpacity>
+                            )}
+                            ListEmptyComponent={
+                                searchQuery ? (
+                                    <View style={styles.emptyContainer}>
+                                        <Text style={styles.emptyText}>{translations[language].noResults}</Text>
+                                        <View style={styles.quickAddContainer}>
+                                            <TouchableOpacity
+                                                style={[styles.addPhraseButton, { backgroundColor: '#EDE9FE' }]}
+                                                onPress={() => handleQuickAdd(searchQuery, 'phrase')}
+                                            >
+                                                <Ionicons name="arrow-forward-circle" size={20} color="#4A90E2" />
+                                                <Text style={styles.addPhraseText}>
+                                                    {translations[language].addPhrase}
+                                                </Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[styles.addPhraseButton, { backgroundColor: '#E0F2FE' }]}
+                                                onPress={() => handleQuickAdd(searchQuery, 'word')}
+                                            >
+                                                <Ionicons name="add-circle" size={20} color="#0891B2" />
+                                                <Text style={[styles.addPhraseText, { color: '#0891B2' }]}>
+                                                    {translations[language].addWord}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                ) : null
+                            }
+                            contentContainerStyle={styles.listContent}
+                        />
+                    </View>
+                </>
+            )}
+
+            {/* Layout Mode: BOTTOM - Results at top, search at bottom, built phrase at very bottom */}
+            {layoutMode === 'bottom' && (
+                <>
+                    <View style={[styles.resultsContainer, { flex: 1 }]}>
+                        <FlatList
+                            data={filteredPhrases}
+                            keyExtractor={(item) => item.id}
+                            scrollEventThrottle={16}
+                            inverted
+                            renderItem={({ item, index }) => (
+                                <TouchableOpacity
+                                    style={[
+                                        styles.suggestionItem,
+                                        hoveredIndex === index && styles.suggestionItemHovered
+                                    ]}
+                                    onPress={() => addToBuilder(item)}
+                                    onPressIn={() => setHoveredIndex(index)}
+                                    onPressOut={() => setHoveredIndex(null)}
+                                    // @ts-ignore - Web-specific hover events
+                                    onMouseEnter={() => setHoveredIndex(index)}
+                                    onMouseLeave={() => setHoveredIndex(null)}
+                                >
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: scale(8) }}>
+                                            <Text style={styles.suggestionText}>{item.text}</Text>
+                                            {item.type === 'word' && (
+                                                <View style={styles.wordBadge}>
+                                                    <Text style={styles.wordBadgeText}>+</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                        {showPictograms && item.pictograms && item.pictograms.length > 0 && (
+                                            <View style={styles.suggestionPictograms}>
+                                                {item.pictograms.map((pic, idx) => (
+                                                    <Image
+                                                        key={idx}
+                                                        source={{ uri: pic.base64 || pic.url }}
+                                                        style={styles.suggestionImage}
+                                                    />
+                                                ))}
+                                            </View>
+                                        )}
+                                    </View>
+                                    <Ionicons
+                                        name={item.type === 'word' ? "add-circle-outline" : "arrow-forward-circle-outline"}
+                                        size={24}
+                                        color="#4A90E2"
+                                    />
+                                </TouchableOpacity>
+                            )}
+                            ListEmptyComponent={
+                                searchQuery ? (
+                                    <View style={styles.emptyContainer}>
+                                        <Text style={styles.emptyText}>{translations[language].noResults}</Text>
+                                        <View style={styles.quickAddContainer}>
+                                            <TouchableOpacity
+                                                style={[styles.addPhraseButton, { backgroundColor: '#EDE9FE' }]}
+                                                onPress={() => handleQuickAdd(searchQuery, 'phrase')}
+                                            >
+                                                <Ionicons name="arrow-forward-circle" size={20} color="#4A90E2" />
+                                                <Text style={styles.addPhraseText}>
+                                                    {translations[language].addPhrase}
+                                                </Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[styles.addPhraseButton, { backgroundColor: '#E0F2FE' }]}
+                                                onPress={() => handleQuickAdd(searchQuery, 'word')}
+                                            >
+                                                <Ionicons name="add-circle" size={20} color="#0891B2" />
+                                                <Text style={[styles.addPhraseText, { color: '#0891B2' }]}>
+                                                    {translations[language].addWord}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                ) : null
+                            }
+                            contentContainerStyle={styles.listContent}
+                        />
+                    </View>
+                    <View style={styles.searchContainer}>
+                        <View style={styles.searchBar}>
+                            <TextInput
+                                ref={searchInputRef}
+                                style={styles.searchInput}
+                                placeholder={translations[language].placeholder}
+                                value={searchQuery}
+                                onChangeText={handleSearchChange}
+                                onSubmitEditing={handleSearchSubmit}
+                                blurOnSubmit={false}
+                                autoCapitalize="characters"
+                            />
+                            {searchQuery.length > 0 && (
+                                <TouchableOpacity onPress={() => handleSearchChange('')}>
+                                    <Ionicons name="close-circle" size={20} color="#999" />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    </View>
+                </>
+            )}
+
         </SafeAreaView >
     );
 }
@@ -255,154 +436,157 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        backgroundColor: '',
-        borderBottomWidth: 0,
-        boxShadow: '0 2px 8px rgba(117, 56, 109, 0.88)',
+        paddingHorizontal: scale(16),
+        paddingVertical: scale(8),
+        backgroundColor: 'transparent',
     },
     compactHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
+        paddingHorizontal: scale(12),
+        paddingVertical: scale(8),
         backgroundColor: 'rgba(117, 56, 109, 0.41)',
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(0, 0, 0, 0.05)',
         boxShadow: '0 1px 4px rgba(0, 0, 0, 0.05)',
     },
     compactButton: {
-        padding: 8,
+        padding: scale(8),
         backgroundColor: '#F0F4F8',
-        borderRadius: 8,
+        borderRadius: scale(8),
     },
     headerTitle: {
-        fontSize: 26,
+        fontSize: moderateScale(18),
         fontWeight: '800',
         color: '#FFFFFF',
         letterSpacing: -0.5,
     },
     settingsButton: {
-        padding: 10,
-        backgroundColor: '#F0F4F8',
-        borderRadius: 12,
+        padding: scale(3),
+        backgroundColor: 'white',
+        borderRadius: scale(4),
+    },
+    languageText: {
+        fontSize: moderateScale(14),
+        fontWeight: '700',
+        color: '#4A90E2',
     },
     builderContainer: {
         backgroundColor: '#FEF3C7',
-        padding: 24,
-        margin: 20,
+        padding: scale(24),
+        margin: scale(20),
         marginBottom: 0,
-        borderRadius: 24,
+        borderRadius: scale(24),
         boxShadow: '0 4px 12px rgba(147, 51, 234, 0.12)',
         borderWidth: 1,
         borderColor: 'rgba(147, 51, 234, 0.15)',
     },
     builtTextRow: {
-        backgroundColor: '#ffffffff',
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        marginHorizontal: 20,
-        marginTop: 2,
-        marginBottom: 10,
-        borderRadius: 16,
+        backgroundColor: 'purple',
+        paddingHorizontal: scale(5),
+        paddingVertical: scale(5),
+        marginHorizontal: scale(20),
+        marginTop: scale(2),
+        marginBottom: scale(5),
+        borderRadius: scale(5),
         borderWidth: 1,
-        borderColor: 'purple',
+        borderColor: '#ffffffff',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
     },
     builtText: {
-        fontSize: 22,
-        color: 'purple',
-        lineHeight: 32,
+        fontSize: moderateScale(22),
+        color: '#ffffffff',
+        lineHeight: moderateScale(32),
         fontWeight: '500',
     },
     controlButtonsRow: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: 12,
-        paddingHorizontal: 20,
-        paddingBottom: 10,
+        gap: scale(12),
+        paddingHorizontal: scale(20),
+        paddingBottom: scale(10),
     },
     pictogramsRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 16,
+        gap: scale(16),
     },
     textControls: {
         flexDirection: 'row',
-        gap: 12,
+        gap: scale(12),
     },
     iconButton: {
-        padding: 4,
+        padding: scale(4),
     },
     pictogramsScroll: {
         flex: 1,
     },
     pictogramsContent: {
         alignItems: 'center',
-        paddingVertical: 8,
+        paddingVertical: scale(8),
     },
     builtPictogram: {
         alignItems: 'center',
-        marginRight: 16,
+        marginRight: scale(16),
         position: 'relative',
     },
     removePictogramButton: {
         position: 'absolute',
-        bottom: -8,
+        bottom: scale(-8),
         left: 0,
         backgroundColor: '#FF6B6B',
-        borderRadius: 12,
-        width: 24,
-        height: 24,
+        borderRadius: scale(12),
+        width: scale(24),
+        height: scale(24),
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 1,
         boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
     },
     builtImage: {
-        width: 80,
-        height: 80,
+        width: scale(80),
+        height: scale(80),
         resizeMode: 'contain',
     },
     searchContainer: {
-        paddingHorizontal: 20,
-        marginBottom: 16,
+        paddingHorizontal: scale(20),
+        marginBottom: scale(16),
     },
     searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        borderRadius: scale(5),
+        paddingHorizontal: scale(5),
+        paddingVertical: scale(5),
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
         borderWidth: 1,
         borderColor: '#F0F4F8',
     },
     searchInput: {
         flex: 1,
-        fontSize: 24,
+        fontSize: moderateScale(24),
         fontWeight: 'bold',
         color: 'purple',
-        padding: 10,
+        padding: scale(10),
     },
     resultsContainer: {
         flex: 1,
-        paddingHorizontal: 20,
+        paddingHorizontal: scale(20),
     },
     listContent: {
-        paddingBottom: 20,
+        paddingBottom: scale(20),
     },
     suggestionItem: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         backgroundColor: '#FFFFFF',
-        padding: 20,
-        marginBottom: 12,
-        borderRadius: 16,
+        padding: scale(5),
+        marginBottom: scale(5),
+        borderRadius: scale(5),
         boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
         borderWidth: 1,
         borderColor: '#F0F4F8',
@@ -411,31 +595,69 @@ const styles = StyleSheet.create({
         backgroundColor: '#EDE9FE'
     },
     suggestionText: {
-        fontSize: 18,
+        fontSize: moderateScale(18),
         color: 'purple',
         fontWeight: '500',
     },
     emptyText: {
         textAlign: 'center',
         color: '#9CA3AF',
-        marginTop: 20,
-        fontSize: 16,
+        marginTop: scale(20),
+        fontSize: moderateScale(16),
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        paddingVertical: scale(20),
+    },
+    addPhraseButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: scale(8),
+        paddingVertical: scale(10),
+        paddingHorizontal: scale(12),
+        borderRadius: scale(10),
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    addPhraseText: {
+        fontSize: moderateScale(13),
+        color: '#4A90E2',
+        fontWeight: '600',
+    },
+    quickAddContainer: {
+        flexDirection: 'row',
+        gap: scale(10),
+        width: '100%',
+        marginTop: scale(10),
     },
     headerButtons: {
         flexDirection: 'row',
-        gap: 10,
+        gap: scale(10),
     },
     activeButton: {
         backgroundColor: '#4A90E2',
     },
     suggestionPictograms: {
         flexDirection: 'row',
-        marginTop: 8,
-        gap: 8,
+        marginTop: scale(8),
+        gap: scale(8),
     },
     suggestionImage: {
-        width: 40,
-        height: 40,
+        width: scale(40),
+        height: scale(40),
         resizeMode: 'contain',
+    },
+    wordBadge: {
+        backgroundColor: '#4A90E2',
+        borderRadius: scale(8),
+        paddingHorizontal: scale(6),
+        paddingVertical: scale(2),
+    },
+    wordBadgeText: {
+        fontSize: moderateScale(10),
+        color: '#FFFFFF',
+        fontWeight: '700',
     },
 });

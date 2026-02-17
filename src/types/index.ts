@@ -9,4 +9,5 @@ export interface Phrase {
     text: string;
     usage_count: number;
     pictograms: Pictogram[];
+    type?: 'word' | 'phrase'; // Default: 'phrase' for backward compatibility
 }

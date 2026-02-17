@@ -7,6 +7,8 @@ import { PhrasesProvider } from '../src/context/PhrasesContext';
 
 SplashScreen.preventAutoHideAsync();
 
+import { StorageProvider } from '../src/context/StorageContext';
+
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     ...Ionicons.font,
@@ -27,11 +29,13 @@ export default function RootLayout() {
   }
 
   return (
-    <PhrasesProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="manage-phrases" />
-      </Stack>
-    </PhrasesProvider>
+    <StorageProvider>
+      <PhrasesProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="manage-phrases" />
+        </Stack>
+      </PhrasesProvider>
+    </StorageProvider>
   );
 }

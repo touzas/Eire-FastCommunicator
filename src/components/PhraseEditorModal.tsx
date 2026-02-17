@@ -18,7 +18,7 @@ import { COMMON_PICTOGRAMS, searchPictograms } from '../utils/arasaac';
 interface PhraseEditorModalProps {
     visible: boolean;
     onClose: () => void;
-    onSave: (text: string, pictograms: Pictogram[]) => void;
+    onSave: (text: string, pictograms: Pictogram[], type: 'word' | 'phrase') => void;
     initialPhrase?: Phrase | null;
 }
 
@@ -30,6 +30,7 @@ export const PhraseEditorModal: React.FC<PhraseEditorModalProps> = ({
 }) => {
     const [text, setText] = useState('');
     const [selectedPictograms, setSelectedPictograms] = useState<Pictogram[]>([]);
+    const [phraseType, setPhraseType] = useState<'word' | 'phrase'>('phrase');
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<Pictogram[]>(COMMON_PICTOGRAMS);
     const [isSearching, setIsSearching] = useState(false);
@@ -38,9 +39,11 @@ export const PhraseEditorModal: React.FC<PhraseEditorModalProps> = ({
         if (initialPhrase) {
             setText(initialPhrase.text);
             setSelectedPictograms(initialPhrase.pictograms);
+            setPhraseType(initialPhrase.type || 'phrase');
         } else {
             setText('');
             setSelectedPictograms([]);
+            setPhraseType('phrase');
         }
         setSearchQuery('');
         setSearchResults(COMMON_PICTOGRAMS);
@@ -63,7 +66,7 @@ export const PhraseEditorModal: React.FC<PhraseEditorModalProps> = ({
 
     const handleSave = () => {
         if (text.trim()) {
-            onSave(text, selectedPictograms);
+            onSave(text, selectedPictograms, phraseType);
             onClose();
         }
     };
@@ -108,6 +111,36 @@ export const PhraseEditorModal: React.FC<PhraseEditorModalProps> = ({
                         autoFocus
                         multiline
                     />
+
+                    <Text style={styles.label}>Tipo:</Text>
+                    <View style={styles.typeSelector}>
+                        <TouchableOpacity
+                            style={[styles.typeButton, phraseType === 'phrase' && styles.typeButtonActive]}
+                            onPress={() => setPhraseType('phrase')}
+                        >
+                            <Ionicons
+                                name={phraseType === 'phrase' ? "arrow-forward-circle" : "arrow-forward-circle-outline"}
+                                size={20}
+                                color={phraseType === 'phrase' ? "#FFFFFF" : "#4A90E2"}
+                            />
+                            <Text style={[styles.typeButtonText, phraseType === 'phrase' && styles.typeButtonTextActive]}>
+                                Frase (reemplaza)
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.typeButton, phraseType === 'word' && styles.typeButtonActive]}
+                            onPress={() => setPhraseType('word')}
+                        >
+                            <Ionicons
+                                name={phraseType === 'word' ? "add-circle" : "add-circle-outline"}
+                                size={20}
+                                color={phraseType === 'word' ? "#FFFFFF" : "#4A90E2"}
+                            />
+                            <Text style={[styles.typeButtonText, phraseType === 'word' && styles.typeButtonTextActive]}>
+                                Palabra (añade)
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
 
                     <Text style={styles.label}>Pictogramas seleccionados:</Text>
                     <View style={styles.selectedPictograms}>
@@ -306,5 +339,33 @@ const styles = StyleSheet.create({
         color: '#666',
         textAlign: 'center',
         marginTop: 4,
+    },
+    typeSelector: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 8,
+    },
+    typeButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: 'white',
+        padding: 12,
+        borderRadius: 8,
+        borderWidth: 2,
+        borderColor: '#4A90E2',
+    },
+    typeButtonActive: {
+        backgroundColor: '#4A90E2',
+    },
+    typeButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#4A90E2',
+    },
+    typeButtonTextActive: {
+        color: '#FFFFFF',
     },
 });

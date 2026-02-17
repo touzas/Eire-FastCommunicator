@@ -1,55 +1,27 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Phrase, Pictogram } from '../types';
 import { urlToBase64 } from '../utils/imageUtils';
+import { useStorage } from './StorageContext';
 
 interface PhrasesContextType {
     phrases: Phrase[];
     loading: boolean;
-    addPhrase: (text: string, pictograms: Pictogram[]) => void;
-    updatePhrase: (id: string, text: string, pictograms: Pictogram[]) => void;
+    addPhrase: (text: string, pictograms: Pictogram[], type?: 'word' | 'phrase') => Promise<Phrase>;
+    updatePhrase: (id: string, text: string, pictograms: Pictogram[], type?: 'word' | 'phrase') => void;
     deletePhrase: (id: string) => void;
     updatePhraseUsage: (id: string) => void;
+    resetPhrases: () => Promise<void>;
 }
 
 const PhrasesContext = createContext<PhrasesContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'phrases_data';
 
-// TODO: Replace with your actual GitHub raw JSON URL
-// Example: 'https://raw.githubusercontent.com/user/repo/main/phrases.json'
-const REMOTE_JSON_URL = '';
-
-const DUMMY_DATA: Phrase[] = [
-    {
-        id: '1',
-        text: 'Quiero agua',
-        usage_count: 10,
-        pictograms: [
-            { word: 'Quiero', url: 'https://api.arasaac.org/api/pictograms/36994' },
-            { word: 'agua', url: 'https://api.arasaac.org/api/pictograms/2349' },
-        ],
-    },
-    {
-        id: '2',
-        text: 'Tengo hambre',
-        usage_count: 5,
-        pictograms: [
-            { word: 'Tengo', url: 'https://api.arasaac.org/api/pictograms/36994' },
-            { word: 'hambre', url: 'https://api.arasaac.org/api/pictograms/5486' },
-        ],
-    },
-    {
-        id: '3',
-        text: 'Hola',
-        usage_count: 15,
-        pictograms: [
-            { word: 'Hola', url: 'https://api.arasaac.org/api/pictograms/5510' },
-        ],
-    },
-];
+import localPhrases from '../../assets/data/phrases.json';
+const DUMMY_DATA: Phrase[] = localPhrases as Phrase[];
 
 export const PhrasesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { saveData, loadData, removeData } = useStorage();
     const [phrases, setPhrases] = useState<Phrase[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -66,54 +38,39 @@ export const PhrasesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }));
     };
 
-    const fetchRemotePhrases = async (): Promise<Phrase[] | null> => {
-        if (!REMOTE_JSON_URL) return null;
-        try {
-            console.log('[PhrasesContext] Fetching remote phrases from:', REMOTE_JSON_URL);
-            const response = await fetch(REMOTE_JSON_URL);
-            if (!response.ok) throw new Error('Failed to fetch remote JSON');
-            const data = await response.json();
-            return data as Phrase[];
-        } catch (error) {
-            console.error('[PhrasesContext] Error fetching remote phrases:', error);
-            return null;
-        }
+    const savePhrases = async (updatedPhrases: Phrase[]) => {
+        await saveData(STORAGE_KEY, updatedPhrases);
+    };
+
+    const resetPhrases = async () => {
+        setLoading(true);
+        await removeData(STORAGE_KEY);
+        const processed = await processPhrasesImages(DUMMY_DATA);
+        setPhrases(processed);
+        await saveData(STORAGE_KEY, processed);
+        setLoading(false);
     };
 
     useEffect(() => {
         const initPhrases = async () => {
             setLoading(true);
             try {
-                // 1. Try to load from Local Storage
-                const storedData = await AsyncStorage.getItem(STORAGE_KEY);
-                let currentPhrases: Phrase[] = storedData ? JSON.parse(storedData) : [];
+                const storedPhrases = await loadData<Phrase[]>(STORAGE_KEY);
 
-                // 2. Try to fetch from Remote (GitHub) and merge if available
-                const remotePhrases = await fetchRemotePhrases();
-                if (remotePhrases) {
-                    console.log('[PhrasesContext] Merging remote phrases');
-                    // Simple merge strategy: use remote as base, keep local ones if they don't exist in remote
-                    const phraseMap = new Map<string, Phrase>();
-                    remotePhrases.forEach(p => phraseMap.set(p.id, p));
-                    currentPhrases.forEach(p => {
-                        if (!phraseMap.has(p.id)) {
-                            phraseMap.set(p.id, p);
-                        }
-                    });
-                    currentPhrases = Array.from(phraseMap.values());
-                }
-
-                // 3. Fallback to dummy data if empty
-                if (currentPhrases.length === 0) {
+                let currentPhrases: Phrase[];
+                if (storedPhrases === null) {
+                    console.log('[PhrasesContext] No stored data found, using defaults.');
                     currentPhrases = DUMMY_DATA;
+                } else {
+                    currentPhrases = storedPhrases;
                 }
 
-                // 4. Process images (Base64) for offline use
                 const processed = await processPhrasesImages(currentPhrases);
                 setPhrases(processed);
 
-                // 5. Save back to AsyncStorage
-                await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(processed));
+                if (storedPhrases === null) {
+                    await saveData(STORAGE_KEY, processed);
+                }
 
             } catch (error) {
                 console.error('[PhrasesContext] Initialization error:', error);
@@ -124,9 +81,9 @@ export const PhrasesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         };
 
         initPhrases();
-    }, []);
+    }, [loadData, saveData]);
 
-    const addPhrase = async (text: string, pictograms: Pictogram[]) => {
+    const addPhrase = async (text: string, pictograms: Pictogram[], type: 'word' | 'phrase' = 'phrase'): Promise<Phrase> => {
         const processedPictograms = await Promise.all(pictograms.map(async (pic) => {
             const base64 = await urlToBase64(pic.url);
             return { ...pic, base64: base64 || undefined };
@@ -137,17 +94,20 @@ export const PhrasesProvider: React.FC<{ children: React.ReactNode }> = ({ child
             text,
             pictograms: processedPictograms,
             usage_count: 0,
+            type,
         };
 
-        const updatedPhrases = [...phrases, newPhrase];
-        setPhrases(updatedPhrases);
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPhrases));
+        return new Promise((resolve) => {
+            setPhrases(prev => {
+                const updated = [...prev, newPhrase];
+                savePhrases(updated);
+                setTimeout(() => resolve(newPhrase), 0);
+                return updated;
+            });
+        });
     };
 
-    const updatePhrase = async (id: string, text: string, pictograms: Pictogram[]) => {
-        const phraseToUpdate = phrases.find(p => p.id === id);
-        if (!phraseToUpdate) return;
-
+    const updatePhrase = async (id: string, text: string, pictograms: Pictogram[], type: 'word' | 'phrase' = 'phrase') => {
         const processedPictograms = await Promise.all(pictograms.map(async (pic) => {
             if (!pic.base64) {
                 const base64 = await urlToBase64(pic.url);
@@ -156,29 +116,33 @@ export const PhrasesProvider: React.FC<{ children: React.ReactNode }> = ({ child
             return pic;
         }));
 
-        const updatedPhrase = { ...phraseToUpdate, text, pictograms: processedPictograms };
-        const updatedPhrases = phrases.map(p => p.id === id ? updatedPhrase : p);
-
-        setPhrases(updatedPhrases);
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPhrases));
+        setPhrases(prev => {
+            const updated = prev.map(p => p.id === id ? { ...p, text, pictograms: processedPictograms, type } : p);
+            savePhrases(updated);
+            return updated;
+        });
     };
 
     const deletePhrase = async (id: string) => {
-        const updatedPhrases = phrases.filter(p => p.id !== id);
-        setPhrases(updatedPhrases);
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPhrases));
+        setPhrases(prev => {
+            const updated = prev.filter(p => p.id !== id);
+            savePhrases(updated);
+            return updated;
+        });
     };
 
     const updatePhraseUsage = async (id: string) => {
-        const updatedPhrases = phrases.map(p =>
-            p.id === id ? { ...p, usage_count: p.usage_count + 1 } : p
-        );
-        setPhrases(updatedPhrases);
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPhrases));
+        setPhrases(prev => {
+            const updated = prev.map(p =>
+                p.id === id ? { ...p, usage_count: p.usage_count + 1 } : p
+            );
+            savePhrases(updated);
+            return updated;
+        });
     };
 
     return (
-        <PhrasesContext.Provider value={{ phrases, loading, addPhrase, updatePhrase, deletePhrase, updatePhraseUsage }}>
+        <PhrasesContext.Provider value={{ phrases, loading, addPhrase, updatePhrase, deletePhrase, updatePhraseUsage, resetPhrases }}>
             {children}
         </PhrasesContext.Provider>
     );

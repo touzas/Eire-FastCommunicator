@@ -3,6 +3,7 @@
         "id": "1",
         "text": "Quiero agua",
         "usage_count": 0,
+        "type": "phrase",
         "pictograms": [
             {
                 "word": "Quiero",
@@ -18,6 +19,7 @@
         "id": "2",
         "text": "Tengo hambre",
         "usage_count": 0,
+        "type": "phrase",
         "pictograms": [
             {
                 "word": "Tengo",
@@ -33,6 +35,7 @@
         "id": "3",
         "text": "Hola",
         "usage_count": 0,
+        "type": "word",
         "pictograms": [
             {
                 "word": "Hola",
