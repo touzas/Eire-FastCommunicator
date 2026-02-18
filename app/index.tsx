@@ -39,15 +39,24 @@ export default function MainScreen() {
             noResults: 'No phrases found.',
             addPhrase: 'Add as Phrase',
             addWord: 'Add as Word',
+            mostUsed: 'Most used',
         },
         es: {
             placeholder: 'Escribe lo que quieras decir...',
             noResults: 'No se encontraron frases.',
             addPhrase: 'Añadir como Frase',
             addWord: 'Añadir como Palabra',
+            mostUsed: 'Más usados',
         },
     };
 
+
+    const mostUsedPhrases = useMemo(() => {
+        return phrases
+            .filter(p => p.usage_count > 0)
+            .sort((a, b) => b.usage_count - a.usage_count)
+            .slice(0, 12);
+    }, [phrases]);
 
     const filteredPhrases = useMemo(() => {
         if (!searchQuery) return [];
@@ -242,6 +251,35 @@ export default function MainScreen() {
                             )}
                         </View>
                     </View>
+
+                    {!searchQuery && mostUsedPhrases.length > 0 && (
+                        <View style={styles.mostUsedContainer}>
+                            <View style={styles.sectionHeader}>
+                                <Ionicons name="stats-chart" size={scale(16)} color="#FFFFFF" />
+                                <Text style={styles.sectionTitle}>{translations[language].mostUsed}</Text>
+                            </View>
+                            <View style={styles.mostUsedGrid}>
+                                {mostUsedPhrases.map((phrase) => (
+                                    <TouchableOpacity
+                                        key={phrase.id}
+                                        style={styles.mostUsedButton}
+                                        onPress={() => addToBuilder(phrase)}
+                                    >
+                                        <Text style={styles.mostUsedButtonText} numberOfLines={1}>
+                                            {phrase.text}
+                                        </Text>
+                                        {showPictograms && phrase.pictograms.length > 0 && (
+                                            <Image
+                                                source={{ uri: phrase.pictograms[0].base64 || phrase.pictograms[0].url }}
+                                                style={styles.mostUsedImage}
+                                            />
+                                        )}
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+                    )}
+
                     <View style={styles.resultsContainer}>
                         <FlatList
                             data={filteredPhrases}
@@ -420,6 +458,34 @@ export default function MainScreen() {
                             )}
                         </View>
                     </View>
+
+                    {!searchQuery && mostUsedPhrases.length > 0 && (
+                        <View style={styles.mostUsedContainer}>
+                            <View style={styles.sectionHeader}>
+                                <Ionicons name="stats-chart" size={scale(16)} color="#FFFFFF" />
+                                <Text style={styles.sectionTitle}>{translations[language].mostUsed}</Text>
+                            </View>
+                            <View style={styles.mostUsedGrid}>
+                                {mostUsedPhrases.map((phrase) => (
+                                    <TouchableOpacity
+                                        key={phrase.id}
+                                        style={styles.mostUsedButton}
+                                        onPress={() => addToBuilder(phrase)}
+                                    >
+                                        <Text style={styles.mostUsedButtonText} numberOfLines={1}>
+                                            {phrase.text}
+                                        </Text>
+                                        {showPictograms && phrase.pictograms.length > 0 && (
+                                            <Image
+                                                source={{ uri: phrase.pictograms[0].base64 || phrase.pictograms[0].url }}
+                                                style={styles.mostUsedImage}
+                                            />
+                                        )}
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+                    )}
                 </>
             )}
 
@@ -659,5 +725,53 @@ const styles = StyleSheet.create({
         fontSize: moderateScale(10),
         color: '#FFFFFF',
         fontWeight: '700',
+    },
+    mostUsedContainer: {
+        marginHorizontal: scale(20),
+        marginBottom: scale(16),
+        padding: scale(12),
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: scale(12),
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(6),
+        marginBottom: scale(10),
+    },
+    sectionTitle: {
+        color: '#FFFFFF',
+        fontSize: moderateScale(14),
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    mostUsedGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: scale(8),
+    },
+    mostUsedButton: {
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: scale(12),
+        paddingVertical: scale(8),
+        borderRadius: scale(8),
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(6),
+        minWidth: '22%',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    },
+    mostUsedButtonText: {
+        color: 'purple',
+        fontSize: moderateScale(14),
+        fontWeight: '600',
+    },
+    mostUsedImage: {
+        width: scale(20),
+        height: scale(20),
+        resizeMode: 'contain',
     },
 });

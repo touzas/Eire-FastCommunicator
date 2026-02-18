@@ -6,6 +6,7 @@ import {
     Alert,
     FlatList,
     Modal,
+    Platform,
     StyleSheet,
     Text,
     TextInput,
@@ -18,6 +19,7 @@ import { PhraseItem } from '../src/components/PhraseItem';
 import { usePhrases } from '../src/context/PhrasesContext';
 import { Phrase, Pictogram } from '../src/types';
 
+import { exportToJson } from '../src/utils/exportUtils';
 import { isTablet, moderateScale, scale } from '../src/utils/responsive';
 
 export default function ManagePhrasesScreen() {
@@ -91,6 +93,17 @@ export default function ManagePhrasesScreen() {
         );
     };
 
+    const handleExport = async () => {
+        try {
+            await exportToJson(phrases, 'phrases.json');
+            if (Platform.OS === 'web') {
+                Alert.alert('Éxito', 'Las frases se han exportado correctamente.');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'No se pudo exportar el archivo.');
+        }
+    };
+
     const numColumns = isTablet() ? 3 : 2;
 
     return (
@@ -100,9 +113,14 @@ export default function ManagePhrasesScreen() {
                     <Ionicons name="arrow-back" size={scale(24)} color="#1A1A1A" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Gestionar Frases</Text>
-                <TouchableOpacity onPress={handleClearCache} style={styles.backButton}>
-                    <Ionicons name="refresh" size={scale(24)} color="#4A90E2" />
-                </TouchableOpacity>
+                <View style={styles.headerRightButtons}>
+                    <TouchableOpacity onPress={handleExport} style={styles.headerButton}>
+                        <Ionicons name="download-outline" size={scale(24)} color="#4A90E2" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleClearCache} style={styles.headerButton}>
+                        <Ionicons name="refresh" size={scale(24)} color="#4A90E2" />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <View style={styles.searchContainer}>
@@ -213,6 +231,14 @@ const styles = StyleSheet.create({
     },
     backButton: {
         padding: scale(8),
+    },
+    headerRightButtons: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    headerButton: {
+        padding: scale(8),
+        marginLeft: scale(4),
     },
     searchContainer: {
         padding: scale(16),
