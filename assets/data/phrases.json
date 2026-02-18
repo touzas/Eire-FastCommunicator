@@ -14926,5 +14926,215 @@
                 "url": "https://api.arasaac.org/api/pictograms/37057?download=false&plural=false&color=true"
             }
         ]
+    },
+    {
+        "id": "1771455167563",
+        "text": "Dame el mando de la tele!",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455176706",
+        "text": "Quiero banquito!",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455182794",
+        "text": "Huevo kinder",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455192347",
+        "text": "Para!",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455197620",
+        "text": "Ya!",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "word"
+    },
+    {
+        "id": "1771455212930",
+        "text": "Quiero subir a ver!",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455217938",
+        "text": "Quiero bajar a ver!",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455230476",
+        "text": "¿Dónde está mamá?",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455236466",
+        "text": "¿Dónde está papá?",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455245579",
+        "text": "¿Mamá está bien?",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455252894",
+        "text": "Quiero ir con mamá!",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455257116",
+        "text": "Quiero ir con papá!",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455270403",
+        "text": "Merendar",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "word"
+    },
+    {
+        "id": "1771455304243",
+        "text": "Sombrilla de chocolate",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455320803",
+        "text": "Me duele la cabeza!",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455333066",
+        "text": "Me duelen los dientes!",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455341234",
+        "text": "Estoy cansada!",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455352803",
+        "text": "Juntos",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "word"
+    },
+    {
+        "id": "1771455360156",
+        "text": "Canta tú!",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455365418",
+        "text": "Repite",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "word"
+    },
+    {
+        "id": "1771455381378",
+        "text": "Casa abuelos",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455388355",
+        "text": "Ir a la piscina",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455394963",
+        "text": "Ir al gimnasio",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455416081",
+        "text": "Quiero lavar los dientes!",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455428171",
+        "text": "Quiero hacer pis!",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455434282",
+        "text": "Quiero hacer caca!",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455452308",
+        "text": "Petit nesquik",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "word"
+    },
+    {
+        "id": "1771455462050",
+        "text": "Bocata",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "word"
+    },
+    {
+        "id": "1771455482411",
+        "text": "Quiero yogur!",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
+    },
+    {
+        "id": "1771455491026",
+        "text": "Quiero ir allí!",
+        "pictograms": [],
+        "usage_count": 1,
+        "type": "phrase"
     }
 ]
