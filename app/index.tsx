@@ -231,7 +231,7 @@ export default function MainScreen() {
                     <View style={styles.builtTextContainer}>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                             <Text style={styles.builtTextPersistent}>
-                                {builtPhrase.text || translations[language].placeholder}
+                                {builtPhrase.text || ""}
                             </Text>
                         </ScrollView>
                     </View>
